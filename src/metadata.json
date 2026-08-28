@@ -9,5 +9,6 @@
     "49",
     "50"
   ],
-  "url": "https://github.com/gortazar/meet"
+  "url": "https://github.com/gortazar/meet",
+  "settings-schema": "org.gnome.shell.extensions.meet"
 }

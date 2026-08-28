@@ -11,6 +11,9 @@ import './metadata.test.js';
 import './destinations.test.js';
 import './launcher.test.js';
 import './icon.test.js';
+import './editing.test.js';
+import './schema.test.js';
+import './hygiene.test.js';
 
 import { run } from './harness.js';
 

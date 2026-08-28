@@ -114,7 +114,11 @@
           unit-tests = pkgs.runCommand "meet-unit-tests"
             {
               src = self;
-              nativeBuildInputs = [ pkgs.gjs pkgs.gdk-pixbuf pkgs.librsvg pkgs.coreutils ];
+              nativeBuildInputs = [
+                pkgs.gjs pkgs.gdk-pixbuf pkgs.librsvg pkgs.coreutils
+                # schema.test.js compiles the shipped schema and reads the default back.
+                pkgs.glib.dev
+              ];
             } ''
             cp -r "$src" ./source
             chmod -R u+w ./source
@@ -154,9 +158,10 @@
             echo "$listing"
             # lib/ is the easy thing to leave out, and the extension does not load without
             # it. Every module the shell-side code imports is named here.
-            for entry in metadata.json extension.js LICENSE \
-                lib/destinations.js lib/launcher.js lib/icon.js \
-                icons/openvidu-meet-symbolic.svg; do
+            for entry in metadata.json extension.js prefs.js LICENSE \
+                lib/destinations.js lib/launcher.js lib/icon.js lib/editing.js \
+                lib/settings.js icons/openvidu-meet-symbolic.svg \
+                schemas/gschemas.compiled; do
               grep -q " $entry\$" <<< "$listing" \
                 || { echo "packed zip is missing $entry" >&2; exit 1; }
             done
@@ -180,7 +185,7 @@
           meta.description = "Run the headless suite against the working tree";
           program = "${pkgs.writeShellApplication {
             name = "meet-tests";
-            runtimeInputs = [ pkgs.gjs pkgs.gdk-pixbuf pkgs.librsvg ];
+            runtimeInputs = [ pkgs.gjs pkgs.gdk-pixbuf pkgs.librsvg pkgs.glib.dev ];
             text = ''
               cd "''${1:-.}"
               ${pixbufEnv}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.meet" path="/org/gnome/shell/extensions/meet/">
+
+    <key name="destinations" type="a(ss)">
+      <default>[('Meet next','https://meet-next.openvidu.io/'),('Meet','https://meet.openvidu.io/')]</default>
+      <summary>The rooms the menu offers</summary>
+      <description>
+        Each entry is a name and an address, in the order the menu shows them. The two that
+        ship by default are ordinary entries: they can be renamed, pointed somewhere else,
+        reordered or removed, and "Restore the defaults" in the preferences puts them back.
+        Only https:// addresses are opened — an entry with any other scheme is ignored.
+      </description>
+    </key>
+
+  </schema>
+</schemalist>
