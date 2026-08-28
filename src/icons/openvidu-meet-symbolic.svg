@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- An original drawing, not OpenVidu's logo: the mark may not be redistributed, so what
+       this echoes is its arrangement — two overlapping conversation bubbles with a play
+       triangle in the front one — and none of its artwork.
+
+       Symbolic, because that is what a GNOME top bar is: one colour, which GTK replaces
+       with the theme's foreground, so the button reads the same in light and dark and
+       carries the same visual weight as the icons beside it. A colour logo would be a
+       smear at 16px and would vanish against half the themes.
+
+       Filled shapes only, no strokes: GTK recolours a symbolic icon by forcing a fill, and
+       a stroked path comes out as an unrecoloured ghost. The back bubble is drawn as a
+       band — an outline made of fill — and stops short of the front one on both ends, so
+       the gap reads as occlusion rather than as a line running through it. -->
+  <path d="M3.5 8H3A2 2 0 0 1 1 6V3A2 2 0 0 1 3 1h5.5A2 2 0 0 1 10.5 3H9.1A.6.6 0 0 0 8.5 2.4H3A.6.6 0 0 0 2.4 3v3A.6.6 0 0 0 3 6.6h.5z"
+        fill="#2e3436"/>
+  <path d="M6.5 4.5H13A2 2 0 0 1 15 6.5v4A2 2 0 0 1 13 12.5H9L5.6 15 6.5 12.5A2 2 0 0 1 4.5 10.5v-4A2 2 0 0 1 6.5 4.5zM8.3 6.7 12.3 8.5 8.3 10.3z"
+        fill="#2e3436" fill-rule="evenodd"/>
+</svg>

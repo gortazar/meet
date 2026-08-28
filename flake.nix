@@ -155,7 +155,8 @@
             # lib/ is the easy thing to leave out, and the extension does not load without
             # it. Every module the shell-side code imports is named here.
             for entry in metadata.json extension.js LICENSE \
-                lib/destinations.js lib/launcher.js; do
+                lib/destinations.js lib/launcher.js lib/icon.js \
+                icons/openvidu-meet-symbolic.svg; do
               grep -q " $entry\$" <<< "$listing" \
                 || { echo "packed zip is missing $entry" >&2; exit 1; }
             done
