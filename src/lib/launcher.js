@@ -91,8 +91,7 @@ function isNoHandler(error) {
     try {
         return error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_SUPPORTED) ||
             error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND);
-    } catch (e) {
-        void e;
+    } catch {
         return false;
     }
 }
@@ -107,8 +106,7 @@ function isNoHandler(error) {
 function report(notify, { title, body }) {
     try {
         notify(title, body);
-    } catch (e) {
-        void e;
+    } catch {
     }
 }
 

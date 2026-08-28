@@ -57,8 +57,7 @@ function urlProblem(url) {
     let parsed;
     try {
         parsed = GLib.Uri.parse(url, GLib.UriFlags.NONE);
-    } catch (e) {
-        void e;
+    } catch {
         return 'that is not an address the browser can open';
     }
 

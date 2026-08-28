@@ -387,8 +387,7 @@ export default class DriverExtension extends Extension {
                 });
             });
             return true;
-        } catch (e) {
-            void e;
+        } catch {
             return false;
         }
     }
@@ -422,8 +421,7 @@ export default class DriverExtension extends Extension {
         // the way to ask for that around between 46 and 50, so try both spellings.
         try {
             global.context.terminate();
-        } catch (e) {
-            void e;
+        } catch {
             Meta.quit(Meta.ExitCode.SUCCESS);
         }
     }
@@ -481,8 +479,7 @@ function resetDestinations() {
 function activate(item) {
     try {
         item.activate(null);
-    } catch (e) {
-        void e;
+    } catch {
         item.emit('activate', null);
     }
 }
@@ -493,8 +490,7 @@ function menuLabels(indicator) {
         return indicator.menu._getMenuItems()
             .map(item => item.label?.text)
             .filter(text => typeof text === 'string' && text !== '');
-    } catch (e) {
-        void e;
+    } catch {
         return [];
     }
 }
