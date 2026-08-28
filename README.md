@@ -65,6 +65,9 @@ the compositor or GTK, and they are thin.
 ci/smoke-test.sh                     # boot a headless GNOME Shell and drive the extension
 ci/smoke-test.sh --shots screenshots # ... and write the images above
 gjs -m ci/crop.js screenshots        # trim them to the part worth looking at
+
+# and, for a release: run the published artefact rather than the checkout
+MEET_INSTALL_ZIP=meet@meet-gs.patxi.shell-extension.zip ci/smoke-test.sh
 ```
 
 This answers what the headless suite cannot: that the icon is actually *drawn* rather than
@@ -72,6 +75,11 @@ the blank GNOME silently substitutes for one it cannot rasterise, that clicking 
 really reaches the desktop's default handler for `https` — a stub browser is registered and
 records what it was asked to open — and that five enable/disable rounds leave nothing
 attached to the main loop.
+
+`MEET_INSTALL_ZIP` is what makes this a check of a *release* rather than of a working tree:
+it unpacks the published zip into the nested shell instead of copying `src/`, so a file left
+out of the package fails here. Everything else in the script reads the checkout, where the
+missing file is still present.
 
 It runs against a throwaway `HOME` of its own. That is not a nicety: it registers a stub
 program as the default browser, and outside that isolation it would do so to the session you
