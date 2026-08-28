@@ -8,6 +8,7 @@
 // is exactly the code the extension runs and not a copy of it.
 
 import './metadata.test.js';
+import './destinations.test.js';
 
 import { run } from './harness.js';
 
