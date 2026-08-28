@@ -1,0 +1,7 @@
+{
+  "uuid": "meet-driver@test.meet-gs",
+  "name": "meet smoke-test driver",
+  "description": "Test-only. Drives the OpenVidu Meet extension inside a throwaway headless shell: waits for it to load, checks the panel button is drawn rather than blank, opens the menu, activates a room and checks the stub browser was asked to open it, then enables and disables it repeatedly and checks nothing is left behind. Never packed, never published.",
+  "shell-version": ["46", "47", "48", "49", "50"],
+  "url": "https://github.com/gortazar/meet"
+}

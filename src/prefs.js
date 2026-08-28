@@ -51,13 +51,19 @@ export default class MeetPreferences extends ExtensionPreferences {
 
     /** Every row, from scratch. Called when the *shape* of the list changes, never on a
      *  keystroke: rebuilding while someone is typing takes the focus out of their box. */
-    _rebuild() {
+    _rebuild({ expandLast = false } = {}) {
         for (const row of this._builtRows ?? [])
             this._group.remove(row);
 
         this._builtRows = this._rooms.map((room, index) => this._roomRow(room, index));
         for (const row of this._builtRows)
             this._group.add(row);
+
+        // A room you just asked for opens ready to be typed into. Pressing "+" and getting
+        // a collapsed row called "New room" leaves you to work out that it has to be
+        // expanded before it can be filled in.
+        if (expandLast && this._builtRows.length > 0)
+            this._builtRows[this._builtRows.length - 1].expanded = true;
 
         if (this._rooms.length === 0) {
             this._emptyRow = new Adw.ActionRow({
@@ -87,8 +93,15 @@ export default class MeetPreferences extends ExtensionPreferences {
         const remove = iconButton('user-trash-symbolic', 'Remove this room');
         remove.connect('clicked', () => this._restructure(removeAt(this._rooms, index)));
 
+        // One box rather than three suffixes. `add_suffix` called three times puts them on
+        // screen in the reverse of the order they were added — which was visible in the
+        // nested-shell screenshot as a delete button sitting nearest the room's name, the
+        // last place a destructive action belongs. A box packs in the order written, and
+        // does not depend on which libadwaita is installed.
+        const buttons = new Gtk.Box({ spacing: 0, valign: Gtk.Align.CENTER });
         for (const button of [up, down, remove])
-            row.add_suffix(button);
+            buttons.append(button);
+        row.add_suffix(buttons);
 
         const name = new Adw.EntryRow({ title: 'Name', text: room.label });
         const address = new Adw.EntryRow({ title: 'Address', text: room.url });
@@ -111,9 +124,9 @@ export default class MeetPreferences extends ExtensionPreferences {
     }
 
     /** A change to the list itself: rebuild the rows, then commit. */
-    _restructure(rooms) {
+    _restructure(rooms, options = {}) {
         this._rooms = rooms;
-        this._rebuild();
+        this._rebuild(options);
         writeDestinations(this._settings, this._rooms);
     }
 
@@ -137,7 +150,8 @@ export default class MeetPreferences extends ExtensionPreferences {
 
     _addButton() {
         const button = iconButton('list-add-symbolic', 'Add a room');
-        button.connect('clicked', () => this._restructure(addDestination(this._rooms)));
+        button.connect('clicked', () =>
+            this._restructure(addDestination(this._rooms), { expandLast: true }));
         return button;
     }
 
