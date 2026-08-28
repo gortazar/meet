@@ -160,7 +160,7 @@
             # it. Every module the shell-side code imports is named here.
             for entry in metadata.json extension.js prefs.js LICENSE \
                 lib/destinations.js lib/launcher.js lib/icon.js lib/editing.js \
-                lib/settings.js icons/openvidu-meet-symbolic.svg \
+                lib/settings.js lib/menu.js icons/openvidu-meet-symbolic.svg \
                 schemas/gschemas.compiled; do
               grep -q " $entry\$" <<< "$listing" \
                 || { echo "packed zip is missing $entry" >&2; exit 1; }

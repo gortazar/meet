@@ -102,6 +102,44 @@ suite('code hygiene', () => {
         }
     });
 
+    test('every signal the indicator connects is disconnected when it is destroyed', () => {
+        // The rule a reviewer checks by hand, checked here instead: a handler that outlives
+        // disable() keeps the whole extension alive with it, and the shell will happily
+        // enable a second copy on top.
+        const source = readFile('src', 'extension.js');
+        const connected = [...source.matchAll(/this\.(_\w+Id) = this\.[\w.]+\.connect\(/g)];
+        assert(connected.length >= 1, 'no stored signal handlers found at all');
+
+        const teardown = source.slice(source.indexOf('_onDestroy()'));
+        for (const [, field] of connected) {
+            assert(teardown.includes(`disconnect(this.${field})`),
+                `${field} is connected but never disconnected in _onDestroy`);
+        }
+    });
+
+    test('disable() destroys the indicator and forgets it', () => {
+        // An indicator left in Main.panel.statusArea is a panel button that no longer
+        // works, and the shell refuses to add a second one under the same name — so the
+        // next enable() silently does nothing.
+        const disable = readFile('src', 'extension.js');
+        const body = disable.slice(disable.indexOf('    disable() {'));
+        assert(body.includes('this._indicator?.destroy()'), 'the indicator is never destroyed');
+        assert(body.includes('this._indicator = null'), 'the indicator reference is kept');
+    });
+
+    test('nothing touches the shell after the indicator is gone', () => {
+        // A launch started just before disable() answers a moment later, on the main loop,
+        // and by then this object has been destroyed. Notifying from there is a JS ERROR in
+        // the journal at best.
+        const source = readFile('src', 'extension.js');
+        assert(source.includes('this._destroyed = true'),
+            'nothing records that the indicator has been destroyed');
+        // The method's definition, not the call site that passes it to the launcher.
+        const notify = source.slice(source.indexOf('    _notify(title, body) {'));
+        assert(notify.slice(0, 200).includes('this._destroyed'),
+            '_notify does not check whether the indicator is still there');
+    });
+
     test('the destinations are named in exactly one place', () => {
         // Two lists of URLs is one list of URLs and one stale list of URLs. The schema
         // default is the other statement of them, and schema.test.js holds it against this
