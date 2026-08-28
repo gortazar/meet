@@ -1,0 +1,14 @@
+{
+  "uuid": "meet@meet-gs.patxi",
+  "name": "OpenVidu Meet",
+  "description": "A top bar button that opens your OpenVidu Meet rooms in the default browser. Ships with meet-next.openvidu.io and meet.openvidu.io; add, edit or remove entries in the preferences.",
+  "shell-version": [
+    "46",
+    "47",
+    "48",
+    "49",
+    "50"
+  ],
+  "url": "https://github.com/gortazar/meet",
+  "settings-schema": "org.gnome.shell.extensions.meet"
+}

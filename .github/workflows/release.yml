@@ -1,0 +1,58 @@
+# Publish a release for a tag.
+#
+#     git tag v0.1 && git push origin v0.1
+#
+# Everything this needs is in this repository, which is why the workflow lives here: the
+# automatic GITHUB_TOKEN can create a release and upload assets in its own repo, and no
+# personal access token or secret is involved.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: "experimental-features = nix-command flakes"
+
+      # A release that fails its own tests is worse than no release.
+      - run: nix flake check --print-build-logs
+
+      - name: Pack the extension
+        run: |
+          nix build --print-build-logs
+          mkdir -p dist
+          cp result/*.shell-extension.zip dist/
+          cd dist
+          for zip in *.zip; do
+            sha256sum "$zip" > "$zip.sha256"
+          done
+          ls -l
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" \
+            --notes "$(cat <<'NOTES'
+          Install without building anything:
+
+          ```sh
+          curl -fsSL https://raw.githubusercontent.com/gortazar/meet/main/install.sh | sh
+          ```
+
+          Then log out and back in, and enable it in the Extensions app.
+
+          The asset below is the packed extension, exactly as `gnome-extensions pack` would
+          lay it out, with its SHA-256 beside it.
+          NOTES
+          )"
