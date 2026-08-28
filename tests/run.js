@@ -9,6 +9,7 @@
 
 import './metadata.test.js';
 import './destinations.test.js';
+import './launcher.test.js';
 
 import { run } from './harness.js';
 
