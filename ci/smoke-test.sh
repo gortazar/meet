@@ -9,6 +9,12 @@
 #   ci/smoke-test.sh              run it
 #   ci/smoke-test.sh --shots DIR  and write screenshots there
 #
+# By default it runs the working tree's src/. Set MEET_INSTALL_ZIP to a packed
+# .shell-extension.zip and it runs that instead — which is how a *published release* gets
+# checked in a real shell rather than merely downloaded:
+#
+#   MEET_INSTALL_ZIP=/path/to/meet@meet-gs.patxi.shell-extension.zip ci/smoke-test.sh
+#
 # The shell is headless (no window appears) and runs against a throwaway HOME of its own, so
 # this touches neither your session nor your dconf. That isolation is not a nicety: the
 # obvious version of this script installs into ~/.local/share/gnome-shell/extensions, rewrites
@@ -60,7 +66,16 @@ mkdir -p "$extensions/$UUID" "$extensions/$DRIVER"
 # beside their XML — because that is what a user installs and what the extension's own
 # paths assume. Installing the checkout's src/ directly would hide a file left out of the
 # package.
-cp -r "$here/src/." "$extensions/$UUID/"
+if [ -n "${MEET_INSTALL_ZIP:-}" ]; then
+  # A published release, run in a real shell rather than merely downloaded. This is the
+  # only check that can catch a file left out of the package: everything else in this
+  # script reads the checkout, where the file is still there.
+  command -v unzip >/dev/null || { echo "unzip not found" >&2; exit 1; }
+  echo "installing from $MEET_INSTALL_ZIP"
+  unzip -q -o "$MEET_INSTALL_ZIP" -d "$extensions/$UUID"
+else
+  cp -r "$here/src/." "$extensions/$UUID/"
+fi
 cp -r "$here/ci/driver/." "$extensions/$DRIVER/"
 glib-compile-schemas "$extensions/$UUID/schemas"
 
