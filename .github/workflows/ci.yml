@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: "experimental-features = nix-command flakes"
+      # ESLint, the headless gjs suite, and the upload zip assembled and inspected. All
+      # hermetic — none of them needs a compositor.
+      - run: nix flake check --print-build-logs
+
+  # The zip is what people install, so build it on every push too rather than finding out at
+  # release time that packing was broken three commits ago.
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: "experimental-features = nix-command flakes"
+      - run: nix build --print-build-logs
+      - run: unzip -l result/*.shell-extension.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shell-extension-zip
+          path: result/*.shell-extension.zip
+
+  # The SonarQube Cloud quality gate. A job of its own, beside `check` rather than inside
+  # it, so a red gate can never be mistaken for a failing test suite.
+  sonar:
+    uses: gortazar/aideas/.github/workflows/sonar.yml@v1
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
