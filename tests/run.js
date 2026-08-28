@@ -15,6 +15,7 @@ import './editing.test.js';
 import './schema.test.js';
 import './hygiene.test.js';
 import './menu.test.js';
+import './packaging.test.js';
 
 import { run } from './harness.js';
 
