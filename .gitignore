@@ -1,0 +1,9 @@
+# nix build output symlinks
+result
+result-*
+
+# throwaway HOME for the nested-shell harness
+.nested/
+
+# screenshots are committed; the scratch the harness writes is not
+screenshots/.scratch/
