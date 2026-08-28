@@ -31,8 +31,9 @@ export function buildMenuModel(destinations) {
     if (items.length === 0)
         items.push({ kind: 'note', label: EMPTY_NOTE, detail: EMPTY_DETAIL });
 
-    items.push({ kind: 'separator' });
-    items.push({ kind: 'preferences', label: PREFERENCES_LABEL });
+    items.push(
+        { kind: 'separator' },
+        { kind: 'preferences', label: PREFERENCES_LABEL });
     return items;
 }
 

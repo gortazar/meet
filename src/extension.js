@@ -101,7 +101,9 @@ class MeetIndicator extends PanelMenu.Button {
         // Activating a PopupMenuItem closes the menu, which is what a launcher should do.
         // The launch itself is asynchronous and its result is a notification, not a return
         // value, so nothing is awaited here.
-        menuItem.connect('activate', () => void this._launcher.open(item.destination));
+        menuItem.connect('activate', () => {
+            this._launcher.open(item.destination);
+        });
         return menuItem;
     }
 
@@ -113,10 +115,9 @@ class MeetIndicator extends PanelMenu.Button {
     _launchContext() {
         try {
             return global.create_app_launch_context(0, -1);
-        } catch (e) {
+        } catch {
             // Better a launch with no context than no launch. The failure modes without one
             // are cosmetic; without the launch there is no extension.
-            void e;
             return null;
         }
     }
