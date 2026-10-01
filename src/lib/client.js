@@ -40,7 +40,7 @@ const ROOMS_PATH = 'api/v1/rooms';
 export const MAX_ITEMS = 100;
 
 /** The statuses that mean the key, not the instance, is the problem. */
-const REFUSING_STATUSES = [401, 403];
+const REFUSING_STATUSES = new Set([401, 403]);
 
 /**
  * The request for an instance's rooms, or `null` if we should not make one.
@@ -119,7 +119,7 @@ function roomsUri(instanceUrl) {
 export function readRoomsResponse(response, instanceUrl) {
     const status = Number.isFinite(response?.status) ? response.status : 0;
 
-    if (REFUSING_STATUSES.includes(status))
+    if (REFUSING_STATUSES.has(status))
         return { status: 'refused' };
     if (status !== 200)
         return { status: 'unreachable' };

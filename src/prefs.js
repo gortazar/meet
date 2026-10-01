@@ -73,7 +73,9 @@ export default class MeetPreferences extends ExtensionPreferences {
         // The keyring answers on its own schedule — it may be locked, and unlocking it is a
         // dialog. So the rows are built first and filled in when the keys arrive, rather
         // than the window waiting on a daemon before it draws anything.
-        this._loadKeys();
+        // `void`: _loadKeys handles its own failures — a keyring that will not open leaves
+        // the fields empty — and fillPreferencesWindow has nowhere to return a promise to.
+        void this._loadKeys();
         // Anything still pending when the window goes is written now rather than lost.
         window.connect('close-request', () => {
             this._flushKeys();
@@ -252,12 +254,15 @@ export default class MeetPreferences extends ExtensionPreferences {
         const { store, clear } = keyUpdates(this._savedRooms, this._rooms);
         this._savedRooms = this._rooms.map(room => ({ ...room }));
 
+        // Neither of these rejects — createKeyStore resolves false rather than throwing —
+        // but _markKeySaved touches widgets, so the `.then` gets a rejection handler too: a
+        // window that has since been closed is the one way this could raise.
         for (const url of clear)
-            this._keyStore.clearKey(url);
+            void this._keyStore.clearKey(url);
         for (const { url, key } of store) {
             const instance = this._rooms.find(room => room.url.trim() === url);
-            this._keyStore.storeKey(instance ?? { url }, key)
-                .then(ok => this._markKeySaved(url, ok));
+            void this._keyStore.storeKey(instance ?? { url }, key)
+                .then(ok => this._markKeySaved(url, ok), () => {});
         }
     }
 

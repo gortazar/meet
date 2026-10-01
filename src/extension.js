@@ -161,8 +161,11 @@ class MeetIndicator extends PanelMenu.Button {
         // a review problem; and closing the menu is the moment nothing is waiting on the
         // answer any more, so it is also where the request is abandoned.
         this._menuStateId = this.menu.connect('open-state-changed', (menu, isOpen) => {
+            // `void`: _refreshRooms is documented never to reject, and this is a signal
+            // handler with nowhere to return a promise to. Marking it says that on purpose,
+            // rather than leaving a floating promise for a reader to have to verify.
             if (isOpen)
-                this._refreshRooms();
+                void this._refreshRooms();
             else
                 this._cancelRefresh();
         });
@@ -314,7 +317,7 @@ class MeetIndicator extends PanelMenu.Button {
         if (item.kind === 'room') {
             const roomItem = new RoomMenuItem(item);
             if (item.destination !== null)
-                roomItem.connect('activate', () => this._launcher.open(item.destination));
+                roomItem.connect('activate', () => void this._launcher.open(item.destination));
             return roomItem;
         }
 
@@ -328,9 +331,9 @@ class MeetIndicator extends PanelMenu.Button {
 
         // Activating a PopupMenuItem closes the menu, which is what a launcher should do.
         // The launch itself is asynchronous and its result is a notification, not a return
-        // value, so nothing is awaited here.
+        // value, so nothing is awaited here — `open` never rejects, and `void` says so.
         menuItem.connect('activate', () => {
-            this._launcher.open(item.destination);
+            void this._launcher.open(item.destination);
         });
         return menuItem;
     }

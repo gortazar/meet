@@ -83,8 +83,7 @@ export function buildMenuModel(instances, roomStates = {}) {
             label: displayLabel(instance),
             indented: false,
             destination: instance,
-        });
-        items.push(...roomItems(instance, states[instance?.url]));
+        }, ...roomItems(instance, states[instance?.url]));
     }
 
     if (items.length === 0)

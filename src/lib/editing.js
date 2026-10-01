@@ -43,12 +43,7 @@ export function replaceAt(list, index, patch) {
     const rows = asList(list);
     if (!inRange(rows, index) || patch === null || typeof patch !== 'object')
         return rows;
-    return rows.map((row, i) => i === index
-        ? withKey({
-            label: typeof patch.label === 'string' ? patch.label : row.label,
-            url: typeof patch.url === 'string' ? patch.url : row.url,
-        }, typeof patch.apiKey === 'string' ? patch.apiKey : row.apiKey)
-        : row);
+    return rows.map((row, i) => i === index ? patched(row, patch) : row);
 }
 
 /**
@@ -108,6 +103,19 @@ export function isBlank(row) {
     const label = typeof row?.label === 'string' ? row.label.trim() : '';
     const url = typeof row?.url === 'string' ? row.url.trim() : '';
     return label === '' && (url === '' || url === BLANK_DESTINATION.url);
+}
+
+/**
+ * One row with a patch applied: each field the patch names, and the row's own otherwise.
+ *
+ * A patch of `{ url }` leaves the label and the key alone, which is what an entry row's
+ * `changed` signal wants to say.
+ */
+function patched(row, patch) {
+    return withKey({
+        label: typeof patch.label === 'string' ? patch.label : row.label,
+        url: typeof patch.url === 'string' ? patch.url : row.url,
+    }, typeof patch.apiKey === 'string' ? patch.apiKey : row.apiKey);
 }
 
 /**
