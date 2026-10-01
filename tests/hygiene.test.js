@@ -140,6 +140,28 @@ suite('code hygiene', () => {
             '_notify does not check whether the indicator is still there');
     });
 
+    test('the API key is never put on screen in clear', () => {
+        // A key legible in a settings window is a key that ends up in a screen share. The
+        // row has to be the password one, which is also what tells a screen reader not to
+        // read it out.
+        const prefs = readFile('src', 'prefs.js');
+        assert(prefs.includes('Adw.PasswordEntryRow'),
+            'the API key field is not a password row');
+        assert(/title: 'API key'/.test(prefs), 'no API key field at all');
+    });
+
+    test('the API key never reaches GSettings', () => {
+        // The answered open question put it in the keyring precisely so that it is not in a
+        // dconf dump. toPairs drops it; nothing else may put it back.
+        const settings = readFile('src', 'lib', 'settings.js');
+        assert(!settings.includes('apiKey'), 'settings.js mentions the API key');
+        const schema = readFile('src', 'schemas', 'org.gnome.shell.extensions.meet.gschema.xml');
+        for (const needle of ['key', 'secret', 'token']) {
+            assert(!schema.toLowerCase().includes(`name="${needle}`),
+                `the schema has a ${needle} key, which dconf would show in clear`);
+        }
+    });
+
     test('the destinations are named in exactly one place', () => {
         // Two lists of URLs is one list of URLs and one stale list of URLs. The schema
         // default is the other statement of them, and schema.test.js holds it against this

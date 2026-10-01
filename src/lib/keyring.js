@@ -182,6 +182,9 @@ export function keyUpdates(before, after) {
     const previous = usableInstances(before);
     const current = usableInstances(after);
     const currentUrls = new Set(current.map(instance => instance.url.trim()));
+    const previousKeys = new Map(previous
+        .filter(instance => typeof instance.apiKey === 'string')
+        .map(instance => [instance.url.trim(), instance.apiKey.trim()]));
 
     const toStore = [];
     const toClear = [];
@@ -190,6 +193,11 @@ export function keyUpdates(before, after) {
         if (typeof instance.apiKey !== 'string')
             continue;
         const key = instance.apiKey.trim();
+        // A key the keyring already holds is not news. Without this, every save rewrites
+        // every key — harmless but for the fact that each rewrite is a chance for a keyring
+        // that has since locked to report a failure about something nobody changed.
+        if (previousKeys.get(url) === key)
+            continue;
         if (key === '')
             toClear.push(url);
         else

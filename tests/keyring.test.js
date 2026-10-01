@@ -239,6 +239,28 @@ suite('what an edit in the preferences does to the keyring', () => {
             { store: [], clear: [] });
     });
 
+    test('a key the keyring already holds is not written again', () => {
+        // Otherwise every save rewrites every key, and each rewrite is a chance for a
+        // keyring that has since locked to report a failure about something nobody touched.
+        assertDeepEqual(keyUpdates([withKey(INSTANCE, 'same')], [withKey(INSTANCE, 'same')]),
+            { store: [], clear: [] });
+    });
+
+    test('a key that changed is written', () => {
+        assertDeepEqual(keyUpdates([withKey(INSTANCE, 'old')], [withKey(INSTANCE, 'new')]),
+            { store: [{ url: INSTANCE.url, key: 'new' }], clear: [] });
+    });
+
+    test('a key already absent is not cleared again', () => {
+        assertDeepEqual(keyUpdates([withKey(INSTANCE, '')], [withKey(INSTANCE, '')]),
+            { store: [], clear: [] });
+    });
+
+    test('whitespace is not a change of key', () => {
+        assertDeepEqual(keyUpdates([withKey(INSTANCE, 'same')], [withKey(INSTANCE, ' same ')]),
+            { store: [], clear: [] });
+    });
+
     test('an instance that is not one is neither stored nor cleared', () => {
         assertDeepEqual(keyUpdates([{ url: 'nonsense' }], [{ url: 'nonsense', apiKey: 'k' }]),
             { store: [], clear: [] });
