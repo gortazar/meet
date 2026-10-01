@@ -122,17 +122,29 @@ MEET_INSTALL_ZIP=meet@meet-gs.patxi.shell-extension.zip ci/smoke-test.sh
 This answers what the headless suite cannot: that the icon is actually *drawn* rather than
 the blank GNOME silently substitutes for one it cannot rasterise, that clicking a room
 really reaches the desktop's default handler for `https` — a stub browser is registered and
-records what it was asked to open — and that five enable/disable rounds leave nothing
-attached to the main loop.
+records what it was asked to open — that a room's **join button** is drawn, nameable by a
+screen reader, reachable by keyboard and hands over the role link with its secret intact,
+that an API key really survives a round trip through a real `gnome-keyring-daemon`, that an
+instance which cannot be reached says so while its own row goes on working, and that five
+enable/disable rounds leave nothing attached to the main loop.
+
+One thing it deliberately does not do is stand up a stub OpenVidu instance. This extension
+refuses anything but `https:`, so a stub would need a certificate the machine trusts —
+glib-networking honours no environment override for its trust anchors, and binding a CA
+bundle over the system one needs a user namespace. So the *rooms* and *refused* states have
+their room state injected, while the payload parsing, the widgets, the click and the browser
+handoff are all real; every branch of the response reader is covered by the headless suite,
+and the real transport's failure path is covered by the unreachable check above.
 
 `MEET_INSTALL_ZIP` is what makes this a check of a *release* rather than of a working tree:
 it unpacks the published zip into the nested shell instead of copying `src/`, so a file left
 out of the package fails here. Everything else in the script reads the checkout, where the
 missing file is still present.
 
-It runs against a throwaway `HOME` of its own. That is not a nicety: it registers a stub
-program as the default browser, and outside that isolation it would do so to the session you
-are sitting in.
+It runs against a throwaway `HOME` of its own, with its own session bus and its own
+`gnome-keyring-daemon`. That is not a nicety: it registers a stub program as the default
+browser and writes an API key to a keyring, and outside that isolation it would do both to
+the session you are sitting in.
 
 ## Licence
 
