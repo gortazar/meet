@@ -2,7 +2,7 @@
 // the one that keeps this suite honest: everything with a decision in it stays out of the
 // compositor-only files, or it stops being testable here.
 
-import { suite, test, assert } from './harness.js';
+import { suite, test, assert, assertDeepEqual } from './harness.js';
 import { readFile, listFiles } from './util.js';
 
 const LIB = listFiles('src', 'lib').filter(name => name.endsWith('.js'));
@@ -43,17 +43,108 @@ suite('code hygiene', () => {
             'prefs.js does not export an ExtensionPreferences subclass');
     });
 
-    test('nothing reaches the network, from anywhere', () => {
-        // The answered open question about the logo turns on exactly this: the icon is
-        // vendored as a drawing precisely so that nothing has to be fetched at runtime. A
-        // decoration that needs the network fails offline and is a review rejection.
-        for (const parts of ALL_SOURCES) {
-            const source = readFile(...parts);
+    test('exactly one file reaches the network, and it is named here', () => {
+        // 0.1's rule was that nothing anywhere made a request. 0.2 replaces that rule rather
+        // than dropping it: listing an instance's rooms needs one, and the point of naming
+        // the single file that may make it is that a second one cannot appear quietly.
+        const allowed = 'src/extension.js';
+        const carriers = ALL_SOURCES
+            .filter(parts => readFile(...parts).includes('gi://Soup'))
+            .map(parts => parts.join('/'));
+        assertDeepEqual(carriers, [allowed],
+            `gi://Soup is imported by ${carriers.join(', ') || 'nothing at all'}`);
+    });
+
+    test('nothing under lib/ can reach the network even in principle', () => {
+        // Which is what keeps client.js testable: every decision about a request is made
+        // over an injected seam, and the seam is the four lines in extension.js.
+        for (const name of LIB) {
+            const source = readFile('src', 'lib', name);
             for (const needle of ['gi://Soup', 'XMLHttpRequest', 'fetch(']) {
                 assert(!source.includes(needle),
-                    `${parts.join('/')} uses ${needle} — this extension makes no requests`);
+                    `lib/${name} uses ${needle}, so the request is no longer injectable`);
             }
         }
+    });
+
+    test('the icon is still never fetched', () => {
+        // The answered open question about the logo turns on exactly this: the icon is
+        // vendored as a drawing precisely so that nothing has to be fetched at runtime.
+        for (const parts of ALL_SOURCES) {
+            const source = readFile(...parts);
+            assert(!/gi:\/\/Soup[\s\S]{0,400}icon/i.test(source),
+                `${parts.join('/')} fetches something to do with the icon`);
+        }
+    });
+
+    test('no synchronous Soup call anywhere, which would freeze the compositor', () => {
+        // `send_and_read` and `send` are the blocking spellings and sit one underscore away
+        // from the asynchronous ones, which is exactly how one gets written by accident.
+        for (const parts of ALL_SOURCES) {
+            const source = readFile(...parts);
+            for (const needle of ['send_and_read(', 'send_async_internal', '.send(']) {
+                assert(!source.includes(needle),
+                    `${parts.join('/')} uses ${needle}, which blocks the main loop`);
+            }
+            assert(!/\.send_and_read\s*\(/.test(source),
+                `${parts.join('/')} calls send_and_read synchronously`);
+        }
+    });
+
+    test('no response status is ever read through get_status()', () => {
+        // It throws on any status outside libsoup's own enum — 429 is the one that bit a
+        // sibling idea — and a throw from inside the async callback settles no promise, so
+        // the request hangs for ever. The status is read as a property instead.
+        for (const parts of ALL_SOURCES) {
+            for (const line of readFile(...parts).split('\n')) {
+                // Skipping comments: the one place that explains why this is forbidden has
+                // to be able to name it.
+                if (line.trim().startsWith('//') || line.trim().startsWith('*'))
+                    continue;
+                assert(!line.includes('get_status()'),
+                    `${parts.join('/')} calls get_status(), which throws on an unknown ` +
+                    `status: ${line.trim()}`);
+            }
+        }
+        assert(readFile('src', 'extension.js').includes('message.status_code'),
+            'the status is not read as a property either, so how is it read?');
+    });
+
+    test('a request can always be abandoned, and is', () => {
+        const source = readFile('src', 'extension.js');
+        assert(source.includes('Gio.Cancellable'), 'nothing creates a cancellable');
+        assert(source.includes('.cancel()'), 'nothing ever cancels');
+        const teardown = source.slice(source.indexOf('_onDestroy()'));
+        assert(teardown.includes('_cancelRefresh()'),
+            'disable() leaves a request in flight');
+        assert(teardown.includes('abort()'),
+            'disable() leaves the session holding its connections open');
+    });
+
+    test('no credential is ever written to a log or a notification', () => {
+        // A role link's secret is the role, and an API key is an API key. Neither may be
+        // passed to anything that writes text somewhere a person or a journal can read.
+        const writers = /\b(log|logError|notifyError|print|printerr|console\.\w+)\s*\(/;
+        for (const parts of ALL_SOURCES) {
+            for (const line of readFile(...parts).split('\n')) {
+                if (!writers.test(line) || line.trim().startsWith('//'))
+                    continue;
+                for (const needle of ['secret', 'apiKey', 'joinUrl', 'api_key', 'password'])
+                    assert(!line.includes(needle), `${parts.join('/')}: ${line.trim()}`);
+            }
+        }
+    });
+
+    test('and every failure message is redacted before it is shown', () => {
+        // The way a secret would reach the screen is not that somebody wrote it into a
+        // message: a launch fails and GIO quotes the URI it was given.
+        const launcher = readFile('src', 'lib', 'launcher.js');
+        assert(launcher.includes('redactSecrets'),
+            'launcher.js builds messages from errors without redacting them');
+        const failure = launcher.slice(launcher.indexOf('export function launchFailureMessage'));
+        assert(!/body: `[^`]*\$\{detail\}/.test(failure) ||
+            failure.includes('redactSecrets(`The default browser'),
+            'the body is built from the raw error message');
     });
 
     test('no http:// anywhere in the sources', () => {
