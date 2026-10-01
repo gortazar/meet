@@ -102,19 +102,35 @@ suite('code hygiene', () => {
         }
     });
 
-    test('every signal the indicator connects is disconnected when it is destroyed', () => {
+    test('every signal the shell connects is disconnected when its actor is destroyed', () => {
         // The rule a reviewer checks by hand, checked here instead: a handler that outlives
         // disable() keeps the whole extension alive with it, and the shell will happily
         // enable a second copy on top.
+        //
+        // Checked per class, because there are two now. A room row owns its join button's
+        // handler and undoes it in its own 'destroy' — which is the right place for it, and
+        // not somewhere the indicator's _onDestroy could reach.
         const source = readFile('src', 'extension.js');
-        const connected = [...source.matchAll(/this\.(_\w+Id) = this\.[\w.]+\.connect\(/g)];
-        assert(connected.length >= 1, 'no stored signal handlers found at all');
+        const classes = source.split(/(?=const \w+ = GObject\.registerClass)/);
+        let found = 0;
 
-        const teardown = source.slice(source.indexOf('_onDestroy()'));
-        for (const [, field] of connected) {
-            assert(teardown.includes(`disconnect(this.${field})`),
-                `${field} is connected but never disconnected in _onDestroy`);
+        for (const body of classes) {
+            const connected = [...body.matchAll(/this\.(_\w+Id) = this\.[\w.]+\.connect\(/g)];
+            if (connected.length === 0)
+                continue;
+            found += connected.length;
+
+            assert(body.includes("connect('destroy'"),
+                'a class connects signals and never hears about its own destruction');
+            for (const [, field] of connected) {
+                assert(body.includes(`disconnect(this.${field})`),
+                    `${field} is connected but never disconnected in the same class`);
+                assert(body.includes(`this.${field} = 0`),
+                    `${field} is disconnected but kept, so a second teardown would repeat it`);
+            }
         }
+
+        assert(found >= 2, `only found ${found} stored signal handlers in all`);
     });
 
     test('disable() destroys the indicator and forgets it', () => {

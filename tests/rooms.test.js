@@ -6,7 +6,7 @@
 
 import { suite, test, assert, assertEqual, assertDeepEqual } from './harness.js';
 import {
-    JOIN_ROLE, joinUrlProblem, parseRoom, parseRooms,
+    JOIN_ROLE, joinUrlProblem, parseRoom, parseRooms, redactSecrets,
 } from '../src/lib/rooms.js';
 
 const INSTANCE = 'https://meet.example.org/';
@@ -262,5 +262,54 @@ suite('a list of rooms', () => {
         parseRooms([null, undefined, [], 'x', { access: { anonymous: null } }], INSTANCE);
         parseRooms([apiRoom()], null);
         parseRooms([apiRoom()], undefined);
+    });
+});
+
+suite('a secret never reaches a message', () => {
+    test('the secret in a join link is replaced, and the rest is left readable', () => {
+        assertEqual(
+            redactSecrets('could not open https://meet.example.org/room/r?secret=abc123'),
+            'could not open https://meet.example.org/room/r?secret=…');
+    });
+
+    test('a secret among other parameters stops at the ampersand', () => {
+        assertEqual(redactSecrets('https://h/r?secret=abc&lang=es'), 'https://h/r?secret=…&lang=es');
+    });
+
+    test('a secret at the end of a sentence does not swallow the sentence', () => {
+        // The trailing full stop goes with it, because a secret may legitimately contain
+        // one and erring towards redacting a character too many is the safe direction.
+        const redacted = redactSecrets('Failed: https://h/r?secret=abc. Try again.');
+        assert(!redacted.includes('abc'), redacted);
+        assert(redacted.includes('Try again.'), redacted);
+    });
+
+    test('a secret in quotes, as a GError quotes a URI', () => {
+        assertEqual(redactSecrets('cannot open "https://h/r?secret=abc"'),
+            'cannot open "https://h/r?secret=…"');
+    });
+
+    test('more than one secret is more than one redaction', () => {
+        const redacted = redactSecrets('a=https://h/1?secret=aaa b=https://h/2?secret=bbb');
+        assert(!redacted.includes('aaa') && !redacted.includes('bbb'), redacted);
+    });
+
+    test('the parameter name is matched however it is cased', () => {
+        assert(!redactSecrets('https://h/r?SECRET=abc').includes('abc'));
+    });
+
+    test('text with no secret in it is handed back unchanged', () => {
+        const message = 'No application is registered as handling this file';
+        assertEqual(redactSecrets(message), message);
+    });
+
+    test('anything that is not text redacts to nothing, rather than throwing', () => {
+        for (const value of [null, undefined, 42, {}])
+            assertEqual(redactSecrets(value), '');
+    });
+
+    test('a real join URL survives it with no secret left in it', () => {
+        const room = parseRoom(apiRoom(), INSTANCE);
+        assert(!redactSecrets(`tried ${room.joinUrl}`).includes('modsecret'));
     });
 });

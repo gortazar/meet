@@ -13,6 +13,7 @@
 import Gio from 'gi://Gio';
 
 import { destinationProblem } from './destinations.js';
+import { redactSecrets } from './rooms.js';
 
 /**
  * A launcher over an injected launch seam.
@@ -62,9 +63,15 @@ export function createLauncher({ launch, notify, launchContext = () => null }) {
  *
  * Split out and exported because this is the part with a decision in it, and because the
  * message it produces is the entire user interface of the failure path.
+ *
+ * Every part of it is redacted on the way out. Since 0.2 one of the things this opens is a
+ * room's join link, whose `secret` query parameter *is* the role: anyone holding it joins
+ * that room as a moderator. Nobody would write it into a notification on purpose — what
+ * happens is that `g_app_info_launch_default_for_uri` fails and quotes the URI it was
+ * given, and the extension shows that message because it is the most useful thing it has.
  */
 export function launchFailureMessage(label, error) {
-    const title = `Could not open ${label || 'the room'}`;
+    const title = redactSecrets(`Could not open ${label || 'the room'}`);
 
     if (isNoHandler(error)) {
         // A real state on a bare machine and in a fresh container. The raw error is
@@ -77,9 +84,9 @@ export function launchFailureMessage(label, error) {
     }
 
     const detail = typeof error?.message === 'string' && error.message !== ''
-        ? error.message
+        ? redactSecrets(error.message)
         : 'the browser did not say why';
-    return { title, body: `The default browser could not open it: ${detail}.` };
+    return { title, body: redactSecrets(`The default browser could not open it: ${detail}.`) };
 }
 
 /** Whether this failure means "nothing on this machine opens https:// links". */

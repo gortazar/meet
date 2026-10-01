@@ -141,6 +141,30 @@ export function joinUrlProblem(url, instanceUrl) {
     return null;
 }
 
+/**
+ * The same text with any role secret in it replaced by an ellipsis.
+ *
+ * A join link is a credential: whoever holds it joins that room as that role. It must not
+ * reach a notification body, and the way it would is not obvious — nobody writes the link
+ * into a message on purpose. What happens is that a launch fails, the `GError` from
+ * `g_app_info_launch_default_for_uri` quotes the URI it was given, and the extension puts
+ * that message on screen because it is the most useful thing it has.
+ *
+ * So every message built from a failure goes through here first. It is deliberately blunt:
+ * it does not parse, because the text it is given is prose with a URL somewhere inside it,
+ * and a redaction that only works on well-formed input is a redaction that fails exactly
+ * when something has gone wrong. For the same reason it errs towards taking a character too
+ * many — a full stop ending the sentence goes with the secret, because a secret may contain
+ * one and the alternative is leaving the last character of a credential on screen.
+ */
+export function redactSecrets(text) {
+    if (typeof text !== 'string')
+        return '';
+    // Up to the next delimiter: & ends a parameter, # ends the query, and whitespace or a
+    // quote ends the URL inside a sentence.
+    return text.replace(/secret=[^&#\s"'<>)\]]*/gi, 'secret=…');
+}
+
 /** A parsed URI, or `null` for anything GLib will not take. */
 function parseUri(url) {
     if (url === '')

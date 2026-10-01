@@ -6,6 +6,7 @@
 // signal handler or a callback across disable() is the classic review rejection, so every
 // one of them is created in enable() and undone in disable().
 
+import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import Gio from 'gi://Gio';
 import St from 'gi://St';
@@ -24,6 +25,66 @@ import { readDestinations, DESTINATIONS_KEY } from './lib/settings.js';
 /** What the panel button calls itself to a screen reader. */
 const ACCESSIBLE_NAME = 'OpenVidu Meet';
 
+/** How far a room row sits in from its instance. One indent step, as the shell uses them. */
+const ROOM_INDENT = '2.5em';
+
+/** The icon on the join button. Adwaita's own, so it follows the icon theme and recolours. */
+const JOIN_ICON = 'call-start-symbolic';
+
+/**
+ * One room: its name, and a button that joins the call.
+ *
+ * A custom item rather than a `PopupMenuItem` because the button has to be reachable in its
+ * own right — its own accessible name, its own keyboard focus — rather than being a picture
+ * glued to the end of a label. Both it and the row itself open the same link, which is what
+ * the answered open question settled: the name does what the button does.
+ */
+const RoomMenuItem = GObject.registerClass(
+class RoomMenuItem extends PopupMenu.PopupBaseMenuItem {
+    _init(item) {
+        super._init({ style: `padding-left: ${ROOM_INDENT};` });
+
+        const label = new St.Label({ text: item.label, y_align: Clutter.ActorAlign.CENTER });
+        this.add_child(label);
+        // What a screen reader reads for the row, and what the shell's own search of a menu
+        // matches on.
+        this.label_actor = label;
+
+        if (item.destination === null) {
+            // A room whose link lib/rooms.js would not vouch for. It is still listed — the
+            // instance really does have this room — but there is nothing here to activate,
+            // and a row that looks clickable and does nothing is worse than a greyed one.
+            this.setSensitive(false);
+            return;
+        }
+
+        // Pushes the button to the trailing edge, and does so under a right-to-left locale
+        // too, which a hand-set x_align would not.
+        this.add_child(new St.Widget({ x_expand: true }));
+
+        this._join = new St.Button({
+            child: new St.Icon({ icon_name: JOIN_ICON, style_class: 'popup-menu-icon' }),
+            style_class: 'button',
+            can_focus: true,
+            y_align: Clutter.ActorAlign.CENTER,
+            accessible_name: item.joinLabel,
+        });
+        // Activating the item rather than launching directly: that is what closes the menu,
+        // and it keeps one handler for the two ways into the same room.
+        this._joinId = this._join.connect('clicked',
+            () => this.activate(Clutter.get_current_event()));
+        this.add_child(this._join);
+
+        this.connect('destroy', () => {
+            if (this._joinId) {
+                this._join.disconnect(this._joinId);
+                this._joinId = 0;
+            }
+            this._join = null;
+        });
+    }
+});
+
 const MeetIndicator = GObject.registerClass(
 class MeetIndicator extends PanelMenu.Button {
     _init(extension) {
@@ -31,6 +92,10 @@ class MeetIndicator extends PanelMenu.Button {
 
         this._extension = extension;
         this._settings = extension.getSettings();
+        // What each instance has told us about its rooms, keyed by instance URL, held for
+        // this session only. No room name and emphatically no join link is written to
+        // dconf: one is a credential and the other is somebody's meeting schedule.
+        this._roomStates = {};
         // Set on the way out, and checked by anything that runs after: a launch started
         // just before disable() answers a moment later, and by then this object is gone.
         this._destroyed = false;
@@ -75,7 +140,8 @@ class MeetIndicator extends PanelMenu.Button {
             return;
 
         this.menu.removeAll();
-        for (const item of buildMenuModel(readDestinations(this._settings))) {
+        const instances = readDestinations(this._settings);
+        for (const item of buildMenuModel(instances, this._roomStates)) {
             // A note is the only entry that is two lines: what is wrong, and what to do
             // about it. Two unclickable items rather than one, because a wrapped label in a
             // popup menu sizes badly at every width but the one it was tried at.
@@ -92,7 +158,21 @@ class MeetIndicator extends PanelMenu.Button {
         if (item.kind === 'separator')
             return new PopupMenu.PopupSeparatorMenuItem();
 
+        // Why an instance is offline, or has no key, or has no rooms. Indented with its
+        // rooms, because it is standing in for them.
+        if (item.kind === 'room-note')
+            return note(item.label, ROOM_INDENT);
+
+        if (item.kind === 'room') {
+            const roomItem = new RoomMenuItem(item);
+            if (item.destination !== null)
+                roomItem.connect('activate', () => this._launcher.open(item.destination));
+            return roomItem;
+        }
+
         const menuItem = new PopupMenu.PopupMenuItem(item.label);
+        if (item.kind === 'more')
+            menuItem.style = `padding-left: ${ROOM_INDENT};`;
         if (item.kind === 'preferences') {
             menuItem.connect('activate', () => this._extension.openPreferences());
             return menuItem;
@@ -138,6 +218,7 @@ class MeetIndicator extends PanelMenu.Button {
         this._settings = null;
         this._launcher = null;
         this._extension = null;
+        this._roomStates = null;
         // The icon and every menu item are children of this actor and go with it; the menu
         // items' handlers go with the items.
         this._icon = null;
@@ -159,9 +240,11 @@ export default class MeetExtension extends Extension {
 }
 
 /** An unclickable line of explanation, styled the way the shell styles one. */
-function note(text) {
+function note(text, indent = null) {
     const item = new PopupMenu.PopupMenuItem(text);
     item.setSensitive(false);
+    if (indent !== null)
+        item.style = `padding-left: ${indent};`;
     return item;
 }
 
