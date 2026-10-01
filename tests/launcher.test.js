@@ -187,3 +187,35 @@ suite('what the failure message says', () => {
         }
     });
 });
+
+suite('a role link never reaches the screen', () => {
+    test('a browser failure quoting the URI is shown with the secret removed', async () => {
+        // Real shape: GIO quotes what it was asked to open. Since 0.2 that can be a join
+        // link, whose secret is the role — anyone holding it joins as a moderator.
+        const shown = [];
+        const launcher = createLauncher({
+            launch: () => Promise.reject(
+                new Error('Failed to open "https://meet.example.org/room/r?secret=s3cr3t"')),
+            notify: (title, body) => shown.push(`${title} ${body}`),
+        });
+
+        await launcher.open({
+            label: 'Weekly sync',
+            url: 'https://meet.example.org/room/r?secret=s3cr3t',
+        });
+        assertEqual(shown.length, 1);
+        assert(!shown[0].includes('s3cr3t'), `the secret was shown: ${shown[0]}`);
+        assert(shown[0].includes('Weekly sync'), `the room was not named: ${shown[0]}`);
+    });
+
+    test('a room named after its own link does not leak it through the title', () => {
+        const message = launchFailureMessage(
+            'https://meet.example.org/room/r?secret=s3cr3t', new Error('no'));
+        assert(!message.title.includes('s3cr3t'), message.title);
+    });
+
+    test('an ordinary failure still says what went wrong', () => {
+        const message = launchFailureMessage('Meet', new Error('the browser crashed'));
+        assert(message.body.includes('the browser crashed'), message.body);
+    });
+});

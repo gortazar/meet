@@ -52,8 +52,13 @@ export function destinationProblem(destination) {
  * `file:` or a `javascript:` here is not a broken link, it is the extension opening
  * something on your behalf that you did not mean. Refusing everything but https costs a
  * self-hosted deployment nothing and closes that off entirely.
+ *
+ * Exported because two other modules need exactly this rule and must not restate it:
+ * `client.js` before it sends an API key to an address, and `keyring.js` before it stores
+ * one against an address. A second, slightly different copy of "is this a safe URL" is how
+ * one of them ends up accepting `http:`.
  */
-function urlProblem(url) {
+export function urlProblem(url) {
     let parsed;
     try {
         parsed = GLib.Uri.parse(url, GLib.UriFlags.NONE);

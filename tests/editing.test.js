@@ -191,3 +191,66 @@ suite('what reaches the setting', () => {
         assertDeepEqual(toPairs([]), []);
     });
 });
+
+suite('an instance carries its API key through an edit', () => {
+    const keyed = { label: 'Work', url: 'https://meet.example.org/', apiKey: 'the-key' };
+
+    test('a row added with a key keeps it', () => {
+        assertEqual(addDestination([], keyed)[0].apiKey, 'the-key');
+    });
+
+    test('a row added without one does not grow an empty key field', () => {
+        // The difference matters: a missing apiKey means "we do not know this instance's
+        // key", and an empty one means "the user cleared it". See keyUpdates.
+        assert(!('apiKey' in addDestination([])[0]), 'a blank row carries an apiKey');
+        assert(!('apiKey' in addDestination([], { label: 'A', url: 'https://a.example/' })[0]));
+    });
+
+    test('renaming an instance does not forget its key', () => {
+        assertEqual(replaceAt([keyed], 0, { label: 'Renamed' })[0].apiKey, 'the-key');
+    });
+
+    test('repointing an instance does not forget its key either', () => {
+        // The key moves with it: keyUpdates stores it under the new URL and clears the old.
+        const moved = replaceAt([keyed], 0, { url: 'https://moved.example/' })[0];
+        assertEqual(moved.apiKey, 'the-key');
+        assertEqual(moved.url, 'https://moved.example/');
+    });
+
+    test('typing a new key replaces the old one', () => {
+        assertEqual(replaceAt([keyed], 0, { apiKey: 'a-newer-key' })[0].apiKey, 'a-newer-key');
+    });
+
+    test('emptying the key field is kept as an empty string, not dropped', () => {
+        const cleared = replaceAt([keyed], 0, { apiKey: '' })[0];
+        assert('apiKey' in cleared, 'the cleared field was dropped, which reads as unknown');
+        assertEqual(cleared.apiKey, '');
+    });
+
+    test('a row whose key was never loaded is not given one by an unrelated edit', () => {
+        const unknown = { label: 'Work', url: 'https://meet.example.org/' };
+        assert(!('apiKey' in replaceAt([unknown], 0, { label: 'Renamed' })[0]),
+            'an edit invented an apiKey, which would clear a key nobody touched');
+    });
+
+    test('moving a row moves its key with it', () => {
+        const list = [keyed, { label: 'Other', url: 'https://b.example/' }];
+        assertEqual(moveAt(list, 0, 1)[1].apiKey, 'the-key');
+    });
+
+    test('a key never reaches the setting, which is the point of the keyring', () => {
+        assertDeepEqual(toPairs([keyed]), [['Work', 'https://meet.example.org/']]);
+    });
+
+    test('a keyed default pair is still the default list, so restore stays greyed out', () => {
+        const defaults = restoreDefaults().map(d => ({ ...d, apiKey: 'k' }));
+        assert(isDefault(defaults), 'adding a key made the shipped list look edited');
+    });
+
+    test('restoring the defaults claims nothing about any key', () => {
+        // Restoring the instance list must not delete the keys for the same two URLs, and
+        // an absent apiKey is what tells keyUpdates to leave them alone.
+        for (const row of restoreDefaults())
+            assert(!('apiKey' in row), 'restoreDefaults invented an apiKey');
+    });
+});

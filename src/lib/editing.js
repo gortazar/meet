@@ -23,7 +23,8 @@ export const BLANK_DESTINATION = Object.freeze({ label: '', url: 'https://' });
  * by getting it wrong first.
  */
 export function addDestination(list, destination = BLANK_DESTINATION) {
-    return [...asList(list), { label: destination.label ?? '', url: destination.url ?? '' }];
+    return [...asList(list), withKey(
+        { label: destination.label ?? '', url: destination.url ?? '' }, destination.apiKey)];
 }
 
 /** Without the row at `index`. An index that is not there changes nothing. */
@@ -42,12 +43,7 @@ export function replaceAt(list, index, patch) {
     const rows = asList(list);
     if (!inRange(rows, index) || patch === null || typeof patch !== 'object')
         return rows;
-    return rows.map((row, i) => i === index
-        ? {
-            label: typeof patch.label === 'string' ? patch.label : row.label,
-            url: typeof patch.url === 'string' ? patch.url : row.url,
-        }
-        : row);
+    return rows.map((row, i) => i === index ? patched(row, patch) : row);
 }
 
 /**
@@ -107,6 +103,34 @@ export function isBlank(row) {
     const label = typeof row?.label === 'string' ? row.label.trim() : '';
     const url = typeof row?.url === 'string' ? row.url.trim() : '';
     return label === '' && (url === '' || url === BLANK_DESTINATION.url);
+}
+
+/**
+ * One row with a patch applied: each field the patch names, and the row's own otherwise.
+ *
+ * A patch of `{ url }` leaves the label and the key alone, which is what an entry row's
+ * `changed` signal wants to say.
+ */
+function patched(row, patch) {
+    return withKey({
+        label: typeof patch.label === 'string' ? patch.label : row.label,
+        url: typeof patch.url === 'string' ? patch.url : row.url,
+    }, typeof patch.apiKey === 'string' ? patch.apiKey : row.apiKey);
+}
+
+/**
+ * A row with its API key attached, or without the field at all when there is no key to
+ * attach.
+ *
+ * The distinction is load-bearing and it is why this is a function rather than a spread.
+ * `keyUpdates` reads a missing `apiKey` as "we do not know this instance's key" and an
+ * `apiKey` of `''` as "the user emptied the field" — the first leaves the keyring alone and
+ * the second clears it. A row that carried `apiKey: undefined` as a *present* property would
+ * still read as unknown, but one that quietly turned `undefined` into `''` would delete a
+ * key every time the window opened before the keyring had answered.
+ */
+function withKey(row, apiKey) {
+    return typeof apiKey === 'string' ? { ...row, apiKey } : row;
 }
 
 function asList(list) {
