@@ -30,7 +30,10 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 shots=""
 [ "${1:-}" = "--shots" ] && { mkdir -p "$2"; shots="$(cd "$2" && pwd)"; }
 
-for tool in gnome-shell dbus-run-session glib-compile-schemas python3; do
+# gnome-keyring-daemon is needed because 0.2 keeps each instance's API key in the keyring:
+# without a secret service on the bus every instance reads "add an API key", and the two
+# checks that depend on one would be vacuous rather than failing.
+for tool in gnome-shell dbus-run-session glib-compile-schemas python3 gnome-keyring-daemon; do
   command -v "$tool" >/dev/null || { echo "$tool not found" >&2; exit 1; }
 done
 
@@ -131,9 +134,14 @@ dbus-run-session -- sh -c "
 log="$work/shell.log"
 echo "booting a headless shell (log: $log)"
 set +e
-timeout 180 dbus-run-session -- \
-  gnome-shell --headless --virtual-monitor 1280x1024 --wayland --no-x11 \
-  >"$log" 2>&1
+# A secret service of its own, on this bus and against this throwaway HOME, unlocked with
+# a password that exists only for the next three minutes. The extension's keyring code is
+# then the real thing talking to a real daemon, and neither touches the session you are in.
+timeout 300 dbus-run-session -- sh -c '
+  printf "%s" "smoke-test" |
+    gnome-keyring-daemon --unlock --components=secrets >/dev/null 2>&1 || true
+  exec gnome-shell --headless --virtual-monitor 1280x1024 --wayland --no-x11
+' >"$log" 2>&1
 shell_status=$?
 set -e
 
@@ -161,7 +169,7 @@ failures = [f for f in results["failures"] if not f.startswith("screenshot ")]
 
 # A screenshot that did not happen is only a failure when one was asked for.
 if shots:
-    for name in ("panel.png", "menu.png", "preferences.png"):
+    for name in ("panel.png", "menu.png", "rooms.png", "preferences.png"):
         if not os.path.exists(os.path.join(shots, name)):
             failures.append(f"no screenshot was written to {shots}/{name}")
 

@@ -55,13 +55,21 @@ const REQUEST_TIMEOUT_SECONDS = 10;
 const RoomMenuItem = GObject.registerClass(
 class RoomMenuItem extends PopupMenu.PopupBaseMenuItem {
     _init(item) {
-        super._init({ style: `padding-left: ${ROOM_INDENT};` });
+        super._init({});
+        // Set afterwards, not passed in: PopupBaseMenuItem runs its params through
+        // Params.parse, which throws on any key it does not know, and `style` is not one of
+        // them. The failure is at construction time, so it takes the whole menu with it.
+        this.style = `padding-left: ${ROOM_INDENT};`;
 
         const label = new St.Label({ text: item.label, y_align: Clutter.ActorAlign.CENTER });
         this.add_child(label);
-        // What a screen reader reads for the row, and what the shell's own search of a menu
-        // matches on.
+        // What a screen reader reads for the row.
         this.label_actor = label;
+        // And `label` as well, because that is the name PopupMenuItem gives its own and
+        // therefore the one everything else looks for — the shell's menu accessors among
+        // them. Without it a room row is on screen and invisible to anything asking the
+        // menu what it holds.
+        this.label = label;
 
         if (item.destination === null) {
             // A room whose link lib/rooms.js would not vouch for. It is still listed — the

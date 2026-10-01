@@ -18,8 +18,12 @@ const CROPS = [
     // pixels in a README is useless. Its neighbours are in frame deliberately — "the same
     // visual weight as the icons beside it" is a claim a reader should be able to check.
     { name: 'panel.png', x: 1130, y: 0, width: 150, height: 34, scale: 3 },
-    // The open menu, with the button it hangs from still in frame.
-    { name: 'menu.png', x: 1040, y: 0, width: 240, height: 190, scale: 2 },
+    // The open menu, with the button it hangs from still in frame. Taller since 0.2: each
+    // instance has a row of its own underneath saying what it knows about its rooms.
+    { name: 'menu.png', x: 1030, y: 0, width: 250, height: 250, scale: 2 },
+    // The same menu with an instance that has answered: its rooms indented beneath it, each
+    // with the button that joins the call.
+    { name: 'rooms.png', x: 1030, y: 0, width: 250, height: 285, scale: 2 },
     // preferences.png is left alone: it is a window, and a window in its desktop is a fair
     // picture of a window.
 ];

@@ -8,7 +8,23 @@
 //      blank square GNOME silently substitutes for an icon it cannot rasterise?
 //   2. does the menu hold the rooms, and does clicking one really reach the desktop's
 //      default handler for https?
-//   3. does disabling it leave anything behind?
+//   3. does a room row draw a join button that a keyboard can reach, and does pressing it
+//      hand the *role link, secret and all* to the browser?
+//   4. does disabling it leave anything behind?
+//
+// What is real here and what is not, stated plainly because it matters:
+//
+//   * The **no-key** and **unreachable** states are end to end. The keyring is a real
+//     gnome-keyring-daemon on the session bus, and the unreachable instance is a real
+//     libsoup request to a real closed port.
+//   * The **rooms** and **refused** states have their room state injected into the
+//     indicator, and only that. The payload is still parsed by the extension's own
+//     parseRooms, the rows are real widgets in a real shell, and the click goes through the
+//     real launcher to the real default handler. What is skipped is the HTTP response
+//     itself — because the extension refuses anything but https, a stub instance would need
+//     a certificate this machine trusts, and glib-networking honours no environment
+//     override for its trust anchors. Every branch of readRoomsResponse is covered
+//     exhaustively by the headless suite instead.
 //
 // Everything it learns is written to $MEET_DRIVER_RESULT as JSON, and then the shell is
 // asked to quit. The script that started the shell reads that file and decides.
@@ -23,6 +39,68 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const TARGET = 'meet@meet-gs.patxi';
 const CYCLES = 5;
+
+/**
+ * An instance nothing is listening on, for the unreachable state.
+ *
+ * Port 1 cannot be bound without root, so connect() is refused immediately and
+ * deterministically — no waiting out the request timeout to learn what we already know.
+ */
+const DEAD_INSTANCE = 'https://127.0.0.1:1/';
+
+/** An obviously fake secret. The real thing is a credential; this is a test fixture. */
+const FAKE_SECRET = 'not-a-real-secret-0000';
+
+/** A canned payload in the shape the OpenVidu Meet REST API documents. */
+const CANNED_ROOMS = [
+    {
+        roomId: 'weekly-sync-001',
+        roomName: 'Weekly sync',
+        owner: 'admin',
+        creationDate: 1620000200000,
+        status: 'open',
+        access: {
+            anonymous: {
+                moderator: {
+                    enabled: true,
+                    url: `https://meet.example.org/room/weekly-sync-001?secret=${FAKE_SECRET}`,
+                },
+                speaker: {
+                    enabled: true,
+                    url: 'https://meet.example.org/room/weekly-sync-001?secret=speaker-0000',
+                },
+            },
+            user: { enabled: false, url: 'https://meet.example.org/room/weekly-sync-001' },
+        },
+    },
+    {
+        roomId: 'retro-002',
+        roomName: 'Retro',
+        owner: 'admin',
+        creationDate: 1620000100000,
+        status: 'closed',
+        access: {
+            anonymous: {
+                moderator: {
+                    enabled: true,
+                    url: `https://meet.example.org/room/retro-002?secret=${FAKE_SECRET}-b`,
+                },
+            },
+        },
+    },
+    {
+        // A room whose link the instance withheld — real, and documented: the url is
+        // "present only when the caller holds the roomShareAccessLinks permission".
+        roomId: 'no-link-003',
+        roomName: 'Hidden link',
+        owner: 'admin',
+        creationDate: 1620000000000,
+        status: 'open',
+        access: { anonymous: { moderator: { enabled: true } } },
+    },
+];
+
+const INSTANCE_URL = 'https://meet.example.org/';
 
 /** What the icon file is called once installed. Kept literal: the point is to catch a
  *  rename that reaches the extension and not the package. */
@@ -176,8 +254,11 @@ export default class DriverExtension extends Extension {
 
         const labels = menuLabels(indicator);
         this._results.menu = labels;
-        this._check('the menu lists the two shipped rooms, Meet next first',
-            labels[0] === 'Meet next' && labels[1] === 'Meet',
+        // Not labels[0] and labels[1] any more: since 0.2 each instance has rows of its own
+        // underneath, and with no API key stored those rows say so.
+        this._check('the menu lists the two shipped instances, Meet next first',
+            labels[0] === 'Meet next' && labels.indexOf('Meet') > 0 &&
+            labels.indexOf('Meet next') < labels.indexOf('Meet'),
             `the menu reads ${JSON.stringify(labels)}`);
         this._check('the menu ends with a way into the preferences',
             labels[labels.length - 1] === 'Rooms…',
@@ -203,6 +284,9 @@ export default class DriverExtension extends Extension {
             this._check('activating a room closes the menu', !indicator.menu.isOpen,
                 'the menu was still open after a room was activated');
         }
+
+        // 4b. The rooms of each instance, which is what 0.2 is about.
+        await this._checkRooms(indicator);
 
         // 5. The menu follows the setting. Removing every room is a state a user can reach,
         // and the menu has to say so rather than opening to nothing.
@@ -270,6 +354,170 @@ export default class DriverExtension extends Extension {
         this._results.cycles = CYCLES;
 
         this._finish();
+    }
+
+    /**
+     * Rooms under their instance, the join button, and the states that stand in for rooms.
+     *
+     * The first two states are end to end; the last two have their room state injected. See
+     * the note at the top of this file for exactly where the line is and why it is there.
+     */
+    async _checkRooms(indicator) {
+        const lib = await this._targetLib();
+        if (lib === null)
+            return;
+
+        // --- no key: real, and the state both shipped instances are in out of the box ---
+        resetDestinations();
+        await this._reopenMenu(indicator);
+        await this._waitFor(
+            () => menuLabels(indicator).includes('Add an API key in Rooms…'), 15000);
+        this._check('an instance with no API key says so, under its own row',
+            menuLabels(indicator).includes('Add an API key in Rooms…'),
+            `the menu reads ${JSON.stringify(menuLabels(indicator))}`);
+
+        // --- unreachable: real. A real request, to a real closed port, over real libsoup ---
+        const keyStore = await lib.keyring.openKeyStore();
+        const dead = { label: 'Dead instance', url: DEAD_INSTANCE };
+        const stored = await keyStore.storeKey(dead, 'a-key-that-is-never-accepted');
+        this._check('the keyring takes an API key', stored === true,
+            'storeKey said no — is gnome-keyring-daemon on this bus?');
+        this._check('and reads the same key back',
+            await keyStore.lookupKey(DEAD_INSTANCE) === 'a-key-that-is-never-accepted',
+            'the key did not survive a round trip through the keyring');
+
+        setDestinations([[dead.label, dead.url]]);
+        await this._reopenMenu(indicator);
+        await this._waitFor(
+            () => menuLabels(indicator).includes(`Could not reach ${dead.label}`), 20000);
+        this._check('an instance that cannot be reached says which one',
+            menuLabels(indicator).includes(`Could not reach ${dead.label}`),
+            `the menu reads ${JSON.stringify(menuLabels(indicator))}`);
+        this._check('and its own row still works, so a dead instance costs only its rooms',
+            menuLabels(indicator)[0] === dead.label,
+            `the menu reads ${JSON.stringify(menuLabels(indicator))}`);
+
+        await keyStore.clearKey(DEAD_INSTANCE);
+
+        // --- rooms: real parsing, real widgets, real click; the response is canned ---
+        setDestinations([['Work', INSTANCE_URL]]);
+        const rooms = lib.rooms.parseRooms(CANNED_ROOMS, INSTANCE_URL);
+        this._check('the canned payload parses into three rooms', rooms.length === 3,
+            `parseRooms returned ${rooms.length}`);
+
+        await this._withRoomState(indicator, { [INSTANCE_URL]: { status: 'ok', rooms } });
+        const labels = menuLabels(indicator);
+        this._results.roomMenu = labels;
+        this._check('the rooms are listed under their instance',
+            labels[0] === 'Work' && labels.includes('Weekly sync') && labels.includes('Retro'),
+            `the menu reads ${JSON.stringify(labels)}`);
+        this._check('most recently created first',
+            labels.indexOf('Weekly sync') < labels.indexOf('Retro'),
+            `the menu reads ${JSON.stringify(labels)}`);
+        this._check('a closed room is listed too, as the answered question asks',
+            labels.includes('Retro'), `the menu reads ${JSON.stringify(labels)}`);
+
+        await this._screenshot('rooms.png');
+
+        const weekly = roomItem(indicator, 'Weekly sync');
+        this._check('there is a room row to join from', weekly !== null,
+            `the menu reads ${JSON.stringify(labels)}`);
+        if (weekly === null)
+            return;
+
+        const button = joinButton(weekly);
+        this._check('the room row draws a join button', button !== null,
+            'no St.Button among the room row\'s children');
+        if (button === null)
+            return;
+
+        this._check('the join button says what it joins, to a screen reader',
+            button.accessible_name === 'Join Weekly sync',
+            `the button calls itself "${button.accessible_name}"`);
+        this._check('the join button can take keyboard focus', button.can_focus === true,
+            'the button cannot be focused, so it cannot be used without a mouse');
+
+        const hidden = roomItem(indicator, 'Hidden link');
+        this._check('a room whose link was withheld is listed with no button',
+            hidden !== null && joinButton(hidden) === null,
+            'a button was drawn for a room with no vouched-for link');
+
+        // The real path: clicked -> item activated -> launcher -> Gio.AppInfo -> the stub
+        // browser registered for x-scheme-handler/https.
+        const before = this._openedUris().length;
+        // St.Button's 'clicked' carries which pointer button it was; 1 is the primary one.
+        button.emit('clicked', 1);
+        await this._waitFor(() => this._openedUris().length > before, 10000);
+        const opened = this._openedUris().slice(before);
+        this._results.joined = opened.map(uri => uri.replace(FAKE_SECRET, '<secret>'));
+        this._check('pressing it asks the browser to open the room',
+            opened.some(uri => uri.startsWith(`${INSTANCE_URL}room/weekly-sync-001`)),
+            `the stub browser was asked to open ${JSON.stringify(this._results.joined)}`);
+        // Asserted by presence, never echoed: this is the whole point of the entry, and the
+        // same URL without its secret is the room's page rather than the call.
+        this._check('and the link it is given is the role link, secret and all',
+            opened.some(uri => uri.includes(`secret=${FAKE_SECRET}`)),
+            'the browser was handed a link with no secret — that is the room page, not the call');
+        this._check('joining a room closes the menu', !indicator.menu.isOpen,
+            'the menu was still open after the join button was pressed');
+
+        // --- refused: injected, because a 401 needs a server we cannot give it ---
+        await this._withRoomState(indicator, { [INSTANCE_URL]: { status: 'refused' } });
+        this._check('a refused API key says the key was refused',
+            menuLabels(indicator).includes('That instance refused the API key'),
+            `the menu reads ${JSON.stringify(menuLabels(indicator))}`);
+
+        indicator.menu.close(false);
+        resetDestinations();
+        await sleep(300);
+    }
+
+    /**
+     * The target extension's own modules, loaded from where they are installed.
+     *
+     * By path rather than by relative import: this driver is a different extension, and the
+     * point is to exercise the code that was packed and installed, not a copy of it.
+     */
+    async _targetLib() {
+        const path = this._manager.lookup(TARGET)?.path;
+        if (!path) {
+            this._fail('the target extension has a path to import from', 'no path');
+            return null;
+        }
+        try {
+            return {
+                keyring: await import(`file://${path}/lib/keyring.js`),
+                rooms: await import(`file://${path}/lib/rooms.js`),
+            };
+        } catch (e) {
+            this._fail('the installed lib/ modules import', String(e));
+            return null;
+        }
+    }
+
+    /** Close the menu and open it again, which is what triggers a refresh. */
+    async _reopenMenu(indicator) {
+        indicator.menu.close(false);
+        await sleep(300);
+        indicator.menu.open(false);
+        await sleep(700);
+    }
+
+    /**
+     * Put a room state into the indicator and redraw.
+     *
+     * Set after the menu is open, and the menu is left open: opening it is what starts a
+     * refresh, and a refresh would overwrite this with the real answer — which for an
+     * instance that does not exist is "could not reach it".
+     */
+    async _withRoomState(indicator, states) {
+        indicator.menu.close(false);
+        await sleep(300);
+        indicator.menu.open(false);
+        await sleep(700);
+        indicator._roomStates = states;
+        indicator._rebuildMenu();
+        await sleep(400);
     }
 
     /** The icon the button was given: ours, at the installed path, and loadable from it. */
@@ -493,6 +741,25 @@ function menuLabels(indicator) {
     } catch {
         return [];
     }
+}
+
+/** The menu item for a room of this name, or null. */
+function roomItem(indicator, name) {
+    try {
+        return indicator.menu._getMenuItems()
+            .find(item => item.label?.text === name) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/** The join button inside a room row, or null when the room has no link to join by. */
+function joinButton(item) {
+    for (const child of item.get_children?.() ?? []) {
+        if (child.constructor?.name?.includes('Button'))
+            return child;
+    }
+    return null;
 }
 
 /** The St.Icon inside the panel button. */
