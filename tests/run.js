@@ -17,6 +17,7 @@ import './hygiene.test.js';
 import './menu.test.js';
 import './rooms.test.js';
 import './client.test.js';
+import './keyring.test.js';
 import './packaging.test.js';
 
 import { run } from './harness.js';

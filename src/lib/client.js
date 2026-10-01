@@ -18,6 +18,7 @@
 
 import GLib from 'gi://GLib';
 
+import { urlProblem } from './destinations.js';
 import { parseRooms } from './rooms.js';
 
 /** The header OpenVidu authenticates the REST API with. Generated on the Embedded page. */
@@ -83,21 +84,10 @@ export function roomsRequest(instanceUrl, apiKey) {
  */
 function roomsUri(instanceUrl) {
     const base = typeof instanceUrl === 'string' ? instanceUrl.trim() : '';
-    if (base === '')
-        return null;
-
-    let parsed;
-    try {
-        parsed = GLib.Uri.parse(base, GLib.UriFlags.NONE);
-    } catch {
-        return null;
-    }
-    // The same rule every URL in this extension is held to. An instance is somewhere we send
-    // a credential, so http: here would be the API key on the wire in clear.
-    if (parsed.get_scheme() !== 'https')
-        return null;
-    const host = parsed.get_host();
-    if (host === null || host === '')
+    // The same rule every URL in this extension is held to, and borrowed rather than
+    // restated: an instance is somewhere we send a credential, so `http:` here would put the
+    // API key on the wire in clear.
+    if (base === '' || urlProblem(base) !== null)
         return null;
 
     // `https://host/meet` and `https://host/meet/` are the same instance to a person, and
