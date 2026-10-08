@@ -10,5 +10,6 @@
     "50"
   ],
   "url": "https://github.com/gortazar/meet",
-  "settings-schema": "org.gnome.shell.extensions.meet"
+  "settings-schema": "org.gnome.shell.extensions.meet",
+  "version-name": "0.4"
 }

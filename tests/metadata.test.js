@@ -32,6 +32,29 @@ suite('metadata.json', () => {
         assertEqual(readJSON('src', 'metadata.json').url, 'https://github.com/gortazar/meet');
     });
 
+    test('carries a version-name, and it is the idea version', () => {
+        // The one file a person opens to answer "what am I running", and the one the
+        // Extensions app reads to show a version against the entry. A literal, because the
+        // upstream suite cannot see STATUS.md — that lives in the workshop repo. What ties
+        // the two together is the wrapper's check-pin.sh, which compares STATUS.md against
+        // this key in the *pinned* commit.
+        assertEqual(readJSON('src', 'metadata.json')['version-name'], '0.4');
+    });
+
+    test('the version has the two-component shape this project versions by', () => {
+        // So `0.4.0` or `v0.4` fail here, by name, rather than at tag time when the release
+        // workflow compares them and refuses — which is the slower way to find out.
+        const version = readJSON('src', 'metadata.json')['version-name'];
+        assert(/^\d+\.\d+$/.test(version),
+            `version-name is "${version}", which is not <major>.<minor>`);
+    });
+
+    test('has no version key, which the Shell assigns and EGO rejects by hand', () => {
+        // version is the integer extensions.gnome.org sets on upload; setting it by hand is
+        // a rejection. It is an easy slip while editing this very object, so it is pinned.
+        assertEqual(readJSON('src', 'metadata.json').version, undefined);
+    });
+
     test('ships the licence the packed zip is required to carry', () => {
         // GPL-2.0-or-later is what extensions.gnome.org expects, and a LICENSE that went
         // missing from src/ is a rejection nobody notices until upload day.
