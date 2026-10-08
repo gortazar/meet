@@ -33,6 +33,30 @@ button rather than with a button that quietly goes somewhere else.
 The newest twenty rooms are shown, closed ones included, with a **…and N more** row when
 there are others.
 
+### Where the button leaves you, and why not one step further
+
+The button opens the room. OpenVidu Meet then shows you its **Join page** — the one that
+asks for a name and has a *Join Meeting* button — and pressing that is what brings up the
+page where the **camera and microphone** are chosen, just before the meeting itself.
+
+It would be better to land on that second page directly, and the extension cannot do it.
+Not because it has not been tried: **OpenVidu Meet has no address for that page.** A room is
+a single route, `room/<room-id>`; the Join page and the device page are two states *inside*
+it rather than two addresses, and the state changes only when the Join page's own button is
+pressed. There is no query parameter that skips it — `skip-lobby` and `skip-prejoin` do not
+exist in OpenVidu Meet, whatever their presence in OpenVidu Call might suggest.
+
+So the button gets you as far as a link can, and the last press is OpenVidu Meet's to give
+away. If a future version offers a parameter for it, one line here is all it would take.
+
+*Checked against `OpenVidu/openvidu-meet` at **v3.9.0**, the current release, and again at
+`main` (2026-10-08), identically in both: `meeting.routes.ts` registers `room/:room-id` and
+`disconnected` and nothing else; `meeting.component.html` renders the lobby while
+`showLobby()` and the device view (`<ov-meeting-view [prejoin]="true">`) after it; the flag
+behind `showLobby()` is assigned `true` in exactly one place — `submitAccess()`, which only
+the Join page's own form calls; and the accepted query parameters are a closed list
+(`EmbeddedAttribute`) that contains no way to skip either page.*
+
 ## Instances, and their API keys
 
 Everything the menu offers is a name, an address and an optional API key, edited in the
@@ -90,6 +114,12 @@ never written to disk. No analytics, no telemetry, no third party.
 - **It does not put a join link anywhere it could be read.** The link's secret is a
   credential; it is never logged and never shown, and a failure message that quotes it —
   which is how your browser reports an error — is redacted before it reaches the screen.
+- **It does not add anything to the link the instance gave it.** No name, no
+  `initial-audio-active`, no `initial-video-active` — the URL handed to your browser is the
+  one the API returned, byte for byte. Appending a parameter that OpenVidu Meet does not
+  read would look like a feature and do nothing; and the device page is exactly where the
+  camera and microphone are meant to be chosen, so deciding that in advance from a settings
+  window would be working against it.
 - **It does not spawn anything.** No `xdg-open`, no `GLib.spawn`, no `Gio.Subprocess`.
 
 OpenVidu and OpenVidu Meet are trademarks of their owners. This is an independent launcher

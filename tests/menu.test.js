@@ -73,6 +73,19 @@ suite('rooms listed under their instance', () => {
                 'https://meet.example.org/room/beta?secret=s-beta']);
     });
 
+    test('the link is launched exactly as the instance gave it, byte for byte', () => {
+        // The answered open question for 0.3: the extension adds nothing to a role link —
+        // no participant-name, no initial-audio-active, no initial-video-active. OpenVidu
+        // Meet has no address for the device page, so a parameter appended here would look
+        // like a feature and do nothing, and pre-deciding the camera and microphone would
+        // work against the very page the button is trying to reach. See the README.
+        const given = 'https://meet.example.org/room/alpha?secret=s-alpha';
+        const model = buildMenuModel([ONE], {
+            [ONE.url]: { status: 'ok', rooms: [room('alpha', { joinUrl: given })] },
+        });
+        assertEqual(roomsOf(model)[0].destination.url, given);
+    });
+
     test('a room destination is labelled with the room, so a failure names it', () => {
         assertEqual(roomsOf(model)[0].destination.label, 'alpha');
     });
