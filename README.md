@@ -6,6 +6,10 @@ One click from the top bar into a meeting room.
 curl -fsSL https://raw.githubusercontent.com/gortazar/meet/main/install.sh | sh
 ```
 
+Its last line tells you what it put there — `meet: installed 0.4 to …` — and the same
+version is in the installed `metadata.json`, so *which release is this* is answerable
+afterwards without guessing from the directory's date. The Extensions app shows it too.
+
 Then log out and back in, and enable it in the Extensions app.
 
 ![the button in the top bar](screenshots/panel.png)

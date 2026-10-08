@@ -23,6 +23,26 @@ jobs:
         with:
           extra_nix_config: "experimental-features = nix-command flakes"
 
+      # The tag and the manifest have to agree, and this runs before anything is built or
+      # published. Without it `git tag v0.9` on this tree would publish a release called
+      # v0.9 containing whatever version the code actually is, and every check in the
+      # repository would stay green — the tag is just a string, and the release title is
+      # just text. This asks the bytes a user would install.
+      #
+      # `jq -r` on a missing key yields the string "null", which can never equal a tag, so a
+      # manifest that lost the key cannot be published either.
+      - name: The tag and the manifest agree
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          manifest_version="$(jq -r '."version-name"' src/metadata.json)"
+          echo "tag=$tag_version  metadata.json=$manifest_version"
+          [ "$tag_version" = "$manifest_version" ] || {
+            echo "refusing to release: the tag says $tag_version and" \
+                 "src/metadata.json says $manifest_version" >&2
+            exit 1
+          }
+
       # A release that fails its own tests is worse than no release.
       - run: nix flake check --print-build-logs
 

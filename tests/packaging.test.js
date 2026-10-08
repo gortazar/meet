@@ -52,6 +52,23 @@ suite('the installer', () => {
             'install.sh does not install into the per-user extensions directory');
     });
 
+    test('it says which version it installed, read from what it unpacked', () => {
+        // "installed to <dir>" leaves you to go and look; "installed 0.4 to <dir>" is the
+        // answer. Read from the unpacked metadata.json rather than from the tag or the
+        // asset name, so it reports what is actually on disk.
+        assert(installer.includes('version-name'),
+            'the installer never reads version-name, so it cannot say what it installed');
+        assert(/installed \$\{?VERSION/.test(installer) || installer.includes('installed $VERSION'),
+            'the installer does not put the version in the line it prints');
+    });
+
+    test('a release without the key still installs, naming it unknown', () => {
+        // VERSION=v0.3 ./install.sh fetches an artefact published before the key existed.
+        // That is a fine thing to install; it is not a fine thing to crash on.
+        assert(installer.includes('unknown version'),
+            'an artefact with no version-name would print an empty version or fail');
+    });
+
     test('it recompiles the schema, so the preferences open', () => {
         assert(installer.includes('glib-compile-schemas'),
             'install.sh never compiles the settings schema');
@@ -105,5 +122,23 @@ suite('the release workflow', () => {
 
     test('it fires on a version tag, which is what the version in STATUS.md becomes', () => {
         assert(release.includes('tags: ["v*"]'), 'the release workflow has no tag trigger');
+    });
+
+    test('it refuses a tag that disagrees with the manifest, before packing anything', () => {
+        // The guard this entry exists for. Without it `git tag v0.9` on this tree publishes
+        // a release called v0.9 containing 0.4's code, and every check stays green.
+        //
+        // Asserted here because the comparison itself only ever runs on a tag push: there
+        // is no pull request on which a reviewer would see it fail, so a quiet deletion
+        // would otherwise be invisible until the day it mattered.
+        assert(release.includes('version-name'),
+            'the release workflow never reads version-name, so it cannot check the tag');
+        assert(release.includes('GITHUB_REF_NAME'),
+            'the release workflow never reads the tag it was triggered by');
+        const guard = release.indexOf('version-name');
+        assert(guard !== -1 && guard < release.indexOf('nix build'),
+            'the version is checked after the pack, so a bad tag still builds an artefact');
+        assert(guard < release.indexOf('gh release create'),
+            'the version is checked after the release is created, which is too late');
     });
 });

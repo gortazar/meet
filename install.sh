@@ -66,7 +66,13 @@ if command -v glib-compile-schemas >/dev/null 2>&1 && [ -d "$dest/schemas" ]; th
     glib-compile-schemas "$dest/schemas" 2>/dev/null || true
 fi
 
-echo "meet: installed to $dest"
+# What was actually unpacked, rather than what the tag or the asset name claimed. An
+# artefact published before 0.4 carries no version-name, and that is worth installing and
+# not worth failing over, so it degrades to a word rather than to an empty gap.
+VERSION_NAME=$(sed -n 's/.*"version-name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+    "$dest/metadata.json" 2>/dev/null | head -1)
+
+echo "meet: installed ${VERSION_NAME:-unknown version} to $dest"
 
 if command -v gnome-extensions >/dev/null 2>&1; then
     # Enabling only works once the shell has noticed the new directory, which on Wayland
